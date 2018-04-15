@@ -3,12 +3,12 @@ from random import randint, choice
 
 class Equation:
 
-    def __init__(self, coefficients=None, right_part=None, variables=('x','y')):
+    def __init__(self, coefficients=None, right_part=None, variables=('x', 'y')):
         if not coefficients:
             self.coefficients = Equation.generate_coefficients()
         else:
             self.coefficients = coefficients
-        if not self.right_part:
+        if not right_part:
             self.right_part = Equation.generate_right_part()
         else:
             self.right_part = right_part
@@ -16,7 +16,54 @@ class Equation:
         self.equation = (self.coefficients, self.right_part, self.variables)
 
     def __str__(self):
-        pass
+        A, B, F_c = self.coefficients
+        F, v1_c, v2_c = self.right_part
+        v1, v2 = self.variables
+        result = ""
+
+        def add_sign(x, s):
+            sgn = ''
+            if x < 0:
+                sgn = ' - '
+            elif s:
+                sgn = ' + '
+            return sgn
+
+        # Производные второго порядка
+        if A[0][0]:
+            result += str(A[0][0]) + ' * d^2(U)/(d' + v1 + '^2)'
+        if A[0][1]:
+            result += add_sign(A[0][1], result)
+            result += str(abs(2*A[0][1])) + ' * d^2(U)/(d' + v1 + '*d' + v2 + ')'
+        if A[1][1]:
+            result += add_sign(A[1][1], result)
+            result += str(abs(A[1][1])) + ' * d^2(U)/(d' + v2 + '^2)'
+
+        # производные первого порядка
+        if B[0]:
+            result += add_sign(B[0], result)
+            result += str(abs(B[0])) + ' * dU/d' + v1
+        if B[1]:
+            result += add_sign(B[1], result)
+            result += str(abs(B[1])) + ' * dU/d' + v2
+
+        if not result:
+            result = '0'
+
+        # правая часть
+        result += ' = '
+        if F_c:
+            result += F + '('
+            if v1_c:
+                result += add_sign(v1_c, result)
+                result += str(abs(v1_c)) + v1
+            if v2_c:
+                result += add_sign(v2_c, result)
+                result += str(abs(v2_c)) + v2
+            result += ')'
+        else:
+            result += ' = 0'
+        return result
 
     @staticmethod
     def generate_coefficients():
@@ -35,7 +82,6 @@ class Equation:
 
     def type_identify(self):
         """
-        :param coefficients: кортеж коеффициентов
         :return: тип уравнения
         0 - эллиптическое
         1 - параболическое
@@ -43,12 +89,12 @@ class Equation:
         """
         A = self.coefficients[0]
         a, b, c = *A[0], A[1][1]
-        type = a*c - b*b
-        if type < 0:
-            return 2
-        if not type:
-            return 1
-        return 0
+        type_id = a*c - b*b
+        if type_id < 0:
+            return 2, "гиперболическое"
+        if not type_id:
+            return 1, "параболическое"
+        return 0, "эллиптическое"
 
     def make_canonical(self):
         """
@@ -77,7 +123,7 @@ class Equation:
         # Uxx = (Uh*h[0] + Up*p[0])h * Hx + (Uh*h[0] + Up*p[0])p * Px =
         # = Uhh*h[0]*h[0] + Uph *p[0]*h[0] + Uhp*h[0]*p[0] + Upp*p[0]*p[0] = Uhh*h[0]^2 + 2*Uhp*h[0]*p[0] + Upp*p[0]^2
         #
-        # Uxy = (Uh*h[0] + Up*p[0])h * Hx + (Uh*h[0] + Up*p[0])p * Px =
+        # Uxy = (Uh*h[0] + Up*p[0])h * Hy + (Uh*h[0] + Up*p[0])p * Py =
         # = Uhh*h[0]*h[1] + Uph*p[0]*h[1] + Uhp*h[0]*p[1] + Upp*p[0]*p[1] = Uhh*h[0]*h[1] + Uhp*(h[0]*p[1]+p[0]*h[1])
         #                                                                                 + Upp*p[0]*p[1]
         #
@@ -113,23 +159,45 @@ class Equation:
         # С(Uhp) * Uhp = F
         """
         step_by_step_solution = []
+        step_by_step_solution.append("Начальный вид уравнения:\n" + str(self))
         coefficients = self.equation[0]
         F = self.equation[1]
         A = coefficients[0]
         B = coefficients[1]
         C = coefficients[2]
         a, b, c = A[0][0], 2 * A[0][1], A[1][1]
+        step_by_step_solution.append("От исходного уравнения перейдем к уравнению характеристик.\nДля этого Uxx заменим"
+                                     " на dy^2, Uxy на dxdy и поменяем знак у коэффициента перед ним, а Uyy заменим на "
+                                     "dx^2, остальные части уравнения отбросим.")
+        step_by_step_solution.append("Имеем:\n")
+        step_by_step_solution.append("{0}*dy^2 + {1}*dxdy + {2}*dx^2 = 0".format(A[0][0], 2*A[0][1], A[1][1]))
+        step_by_step_solution.append("Разделим данное уравнение на dx^2.")
+        step_by_step_solution.append("Получим:\n{0}*y'^2 + {1}*y' + {2} = 0".format(A[0][0], 2*A[0][1], A[1][1]))
+        step_by_step_solution.append("Решим данное квадратное уравнение относительно y'")
         discrimenant = complex(b*b - 4 * a * c)
+        step_by_step_solution.append("Дискрименант = " + str(discrimenant))
         y_derivative_1, y_derivative_2 = (-b+discrimenant**0.5)/2/a, (-b-discrimenant**0.5)/2/a  # y' - корни
-
+        step_by_step_solution.append("y' = " + str(y_derivative_1) + " или y' = " + str(y_derivative_2))
+        step_by_step_solution.append("Проинтегрируем полученные уравнения по dx, имеем:")
+        step_by_step_solution.append("y + " + str(-y_derivative_1) + "*x = const1, или y + " + str(-y_derivative_2) +
+                                     "*x = const2")
+        step_by_step_solution.append("Теперь сделаем замену переменных в зависимости от типа уравнения")
+        step_by_step_solution.append("Тип нашего уравнения - " + self.type_identify()[1])
+        step_by_step_solution.append("Имеем следующую замену:")
         if not y_derivative_2.imag:
             if y_derivative_2 == y_derivative_1:
-                h = (-y_derivative_1, 0)  # коэффициент при x, y
-                p = (-y_derivative_2, 1)
+                step_by_step_solution.append("h = " + str(-y_derivative_1) + "*x, "
+                                             "p = " + str(-y_derivative_2) + "*x + y")
+                h = (-y_derivative_1.real, 0)  # коэффициент при x, y
+                p = (-y_derivative_2.real, 1)
             else:
-                h = (-y_derivative_1, 1)
-                p = (-y_derivative_2, 1)
+                step_by_step_solution.append("h = " + str(-y_derivative_1) + "*x + y, "
+                                             "p = " + str(-y_derivative_2) + "*x + y")
+                h = (-y_derivative_1.real, 1)
+                p = (-y_derivative_2.real, 1)
         else:
+            step_by_step_solution.append("h = " + str(-y_derivative_1.real) + "*x + y, "
+                                         "p = " + str(-y_derivative_1.imag) + "*x")
             h = (-y_derivative_1.real, 1)
             p = (-y_derivative_1.imag, 0)
 
@@ -138,15 +206,42 @@ class Equation:
         if not determinant:
             # нужно перегенирировать уравнение и привести его к каноническому виду
             return Equation().make_canonical
+        step_by_step_solution.append("Пересчитываем производные в новых переменных: ")
+
+        step_by_step_solution.append("Ux = Uh*Hx + Up*Px = Uh*{0} + Up*{1}".format(h[0], p[0]))
+        step_by_step_solution.append("Uy = Uh*Hy + Up*Py = Uh*{0} + Up*{1}".format(h[1], p[1]))
+        step_by_step_solution.append("Uxx = (Uh*{0} + Up*{1})h * Hx + (Uh*{0} + Up*{1})p * Px =\
+                                      Uhh*{2} + Uph*{3} + Uhp*{3} + Upp*{4} = Uhh*{2} + Uhp{5} + Upp*{4}"
+                                     .format(h[0], p[0], h[0]*h[0], h[0]*p[0], p[0]*p[0], 2*h[0]*p[0]))
+        step_by_step_solution.append("Uxy = (Uh*{0} + Up*{1})h * Hy + (Uh*{0} + Up*{1})p * Py =\
+                                              Uhh*{2} + Uph*{3} + Uhp*{4} + Upp*{5} = Uhh*{2} + Uhp*{6} + Upp*{5}"
+                                     .format(h[0], p[0], h[0] * h[1], p[0] * h[1], h[0] * p[1], p[0] * p[1],
+                                             h[0]*p[1]+p[0]*h[1]))
+        step_by_step_solution.append("Uyy = (Uh*{0} + Up*{1})h * Hy + (Uh*{0} + Up*{1})p * Py =\
+                                              Uhh*{2} + Uph*{3} + Uhp*{3} + Upp*{4} = Uhh*{2} + Uhp{5} + Upp*{4}"
+                                     .format(h[1], p[1], h[1] * h[1], h[1] * p[1], p[1] * p[1], 2 * h[1] * p[1]))
 
         newA = [[a*h[0]*h[0] + b*h[0]*h[1] + c*h[1]*h[1], a*p[0]*h[0] + b/2*(h[0]*p[1] + h[1]*p[0]) + c*p[1]*h[1]],
                 [a*p[0]*h[0] + b/2*(h[0]*p[1] + h[1]*p[0]) + c*p[1]*h[1], a*p[0]*p[0] + b*p[0]*p[1] + c*p[1]*p[1]]]
 
         newB = [B[0]*h[0]+B[1]*h[1], B[0]*p[0] + B[1]*p[1]]
 
+        if C:
+            step_by_step_solution.append("Выразим x и y через новые переменные h и p для подставновки "
+                                         "их в правую часть уравнения")
+            step_by_step_solution.append("x = {0}\ny = {1}".format((p[1]*F[1]-p[0]*F[2])/determinant,
+                                                                   (F[2]*h[0]-F[1]*h[1])/determinant))
+
         new_Right_part = (F[0], (p[1]*F[1]-p[0]*F[2])/determinant, (F[2]*h[0]-F[1]*h[1])/determinant)
 
-        return self, Equation((newA, newB, C), new_Right_part, ('h', 'p')), step_by_step_solution
+        step_by_step_solution.append("Подставим новые производные и правую часть в исходное уравнение и получим "
+                                     "канонический вид:")
+
+        newEquation = Equation((newA, newB, C), new_Right_part, ('h', 'p'))
+
+        step_by_step_solution.append(str(newEquation))
+
+        return self, newEquation, step_by_step_solution
 
 
 class Student:
@@ -156,10 +251,10 @@ class Student:
         self.name = name
 
 
-
 def repeater():
     pass
 
 
 if __name__ == '__main__':
-    pass
+    test = Equation(([[1, 1], [1, -3]], [0,0], 0))
+    print('\n'.join(test.make_canonical()[2]))
