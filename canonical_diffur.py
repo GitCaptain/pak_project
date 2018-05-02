@@ -3,13 +3,14 @@ from random import randint, choice
 
 class Equation:
 
-    def __init__(self, coefficients=None, right_part=None, variables=('x', 'y')):
+    def __init__(self, skill=1, coefficients=None, right_part=None, variables=('x', 'y')):
+        self.for_skill = skill
         if not coefficients:
-            self.coefficients = Equation.generate_coefficients()
+            self.coefficients = Equation.generate_coefficients(self.for_skill)
         else:
             self.coefficients = coefficients
         if not right_part:
-            self.right_part = Equation.generate_right_part()
+            self.right_part = Equation.generate_right_part(self.for_skill)
         else:
             self.right_part = right_part
         self.variables = variables
@@ -72,18 +73,18 @@ class Equation:
         return result
 
     @staticmethod
-    def generate_coefficients():
-        A = [[randint(1, 10) for _ in range(2)] for i in range(2)]  # коэффициенты для производных второго порядка 1..10
+    def generate_coefficients(skill=1):
+        A = [[randint(1, skill) for _ in range(2)] for i in range(2)]  # коэффициенты для производных второго порядка 1..skill
         A[0][1] = A[1][0]  # матрица А - симметричная
         B = [randint(0, 1) for _ in range(2)]  # коэффициенты для первых производных 0 или 1
         F = randint(0, 1)  # есть ли правая часть
         return A, B, F
 
     @staticmethod
-    def generate_right_part():
-        funcs = ['cos', 'sin', 'ln', 'exp']
-        x_coefficient = randint(1, 5)
-        y_coefficient = randint(0, 5)
+    def generate_right_part(skill=1):
+        funcs = ['cos', 'sin', 'ln', 'exp', 'tg']
+        x_coefficient = randint(1, skill)
+        y_coefficient = randint(0, skill)
         return choice(funcs), x_coefficient, y_coefficient
 
     def type_identify(self):
@@ -216,7 +217,7 @@ class Equation:
         b = -b  # характеристическое уравнение решено, меняем знак b обратно
         if not determinant:
             # нужно перегенирировать уравнение и привести его к каноническому виду
-            return Equation().make_canonical
+            return Equation(self.for_skill).make_canonical()
         step_by_step_solution.append("Пересчитываем производные в новых переменных: ")
 
         step_by_step_solution.append("Ux = Uh*Hx + Up*Px = Uh*{0} + Up*{1}".format(h[0], p[0]))
@@ -237,18 +238,28 @@ class Equation:
 
         newB = [B[0]*h[0]+B[1]*h[1], B[0]*p[0] + B[1]*p[1]]
 
+        # для упрощения проверки округлим все коэффициенты до sign_cnt знаков после запятой
+        sign_cnt = 2
+        newA[0][0] = round(newA[0][0], sign_cnt)
+        newA[0][1] = round(newA[0][1], sign_cnt)
+        newA[1][0] = round(newA[1][0], sign_cnt)
+        newA[1][1] = round(newA[1][1], sign_cnt)
+        newB[0] = round(newB[0], sign_cnt)
+        newB[1] = round(newB[1], sign_cnt)
+
         if C:
             step_by_step_solution.append("Выразим x и y через новые переменные h и p для подставновки "
                                          "их в правую часть уравнения")
-            step_by_step_solution.append("x = {0}\ny = {1}".format((p[1]*F[1]-p[0]*F[2])/determinant,
-                                                                   (F[2]*h[0]-F[1]*h[1])/determinant))
+            step_by_step_solution.append(("коэффициент при h = {0}\n"
+                                          "коэффициент при p = {1}").format((p[1]*F[1]-p[0]*F[2])/determinant,
+                                                                            (F[2]*h[0]-F[1]*h[1])/determinant))
 
         new_Right_part = (F[0], (p[1]*F[1]-p[0]*F[2])/determinant, (F[2]*h[0]-F[1]*h[1])/determinant)
 
         step_by_step_solution.append("Подставим новые производные и правую часть в исходное уравнение и получим "
                                      "канонический вид:")
 
-        newEquation = Equation((newA, newB, C), new_Right_part, ('h', 'p'))
+        newEquation = Equation(self.for_skill, (newA, newB, C), new_Right_part, ('h', 'p'))
 
         step_by_step_solution.append(str(newEquation))
 
@@ -258,26 +269,78 @@ class Equation:
 class Student:
 
     def __init__(self, name):
-        self.skill_level = 0
+        self.skill_level = 1
         self.name = name
 
 
-def repeater():
-    pass
+def repeater(student):
+    print("Здравствуйте,", student.name)
+    while True:
+        print("Введите 0, если хотите завершить работу")
+        print("Введите 1, если хотите определять тип уравнения")
+        print("Введите 2, если хотите приводить уравнения к каноническому виду")
+        print("Введите 3, если хотите посмотреть ментальную карту")
+        activity_type = int(input().strip())
+        if not activity_type:
+            print("До свидания, сегодня вы хорошо поработали!")
+            break
+
+        if activity_type == 1:
+            to_solve = Equation(student.skill_level)
+            print("Введите тип данного уравнения:")
+            print(to_solve)
+            eq_type = input().strip()
+            if eq_type == to_solve.type_identify()[1]:
+                print("Верно, вы молодец!")
+                student.skill_level += 1
+            else:
+                print("Ошибка! Попробуйте еще раз!")
+                student.skill_level = max(student.skill_level - 1, 1)
+
+        if activity_type == 2:
+            to_solve = Equation(student.skill_level).make_canonical()
+            print("Приведите следующее уравнение к каноническому типу:", to_solve[0])
+            print("Введите какие коэффициенты (с точностью до 2х знаков) у вас получились при")
+            A = [[0, 0], [0, 0]]
+            A[0][0] = float(input("d^2(U)/(dh^2): "))
+            A[0][1] = A[1][0] = float(input("d^2(U)/(dh*dp): ")) / 2
+            A[1][1] = float(input("d^2(U)/(dp^2): "))
+            B = [0, 0]
+            B[0] = float(input("dU/dh: "))
+            B[1] = float(input("dU/dp: "))
+            if (A, B) == to_solve[1].coefficients[:-1]:
+                print("Верно! Вы молодец!")
+                print("Итоговое уравнение:")
+                print(to_solve[1])
+                student.skill_level += 1
+            else:
+                print("Ошибка! Попробуйте еще раз!")
+                student.skill_level = max(student.skill_level-1, 1)
+                need_help = int(input("Введите 1, если хотите посмотреть пошаговое решение: ").strip())
+                if need_help == 1:
+                    print('\n'.join(to_solve[2]))
+
+        if activity_type == 3:
+            pass
 
 
 if __name__ == '__main__':
-    test = Equation(([[1, 1], [1, -3]], [0, 0], 0))  # гиперболический тип
+    """
+    test = Equation(1, ([[1, 1], [1, -3]], [0, 0], 0))  # гиперболический тип
     #print('\n'.join(test.make_canonical()[2]))
 
-    test = Equation(([[3, -2], [-2, 1]], [-3, 1], 0))  # гиперболический тип
+    test = Equation(1, ([[3, -2], [-2, 1]], [-3, 1], 0))  # гиперболический тип
     #print('\n'.join(test.make_canonical()[2]))
 
-    test = Equation(([[2, -2.5], [-2.5, 3]], [0, 0], 0))  # гиперболический тип
+    test = Equation(1, ([[2, -2.5], [-2.5, 3]], [0, 0], 0))  # гиперболический тип
     #print('\n'.join(test.make_canonical()[2]))
 
-    test = Equation(([[1, -1], [-1, 1]], [0, 0], 1), ('exp', 0, 1))  # параболический тип (вывод правой части?? х,у)
+    test = Equation(1, ([[1, -1], [-1, 1]], [0, 0], 1), ('exp', 0, 1))  # параболический тип (вывод правой части?? х,у)
     #print('\n'.join(test.make_canonical()[2]))
 
     test = Equation()  # рандом
-    print('\n'.join(test.make_canonical()[2]))
+    #print('\n'.join(test.make_canonical()[2]))
+    """
+    student = Student(input("Введите имя, чтобы начать: "))
+    repeater(student)
+
